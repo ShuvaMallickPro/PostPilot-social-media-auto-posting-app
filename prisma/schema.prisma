@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  access_token      String   @db.Text
+  refresh_token     String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([provider, providerAccountId])
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  userId    String
+  content   String   @db.Text
+  imageUrl  String?
+  status    String   @default("draft")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  platforms PostPlatform[]
+}
+
+model PostPlatform {
+  id          String    @id @default(cuid())
+  postId      String
+  platform    String
+  status      String    @default("pending")
+  publishedAt DateTime?
+  error       String?
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
