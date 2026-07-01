@@ -129,13 +129,13 @@ export default async function DashboardPage() {
           <CardHeader>
             <CardTitle className="text-lg">What&apos;s next?</CardTitle>
             <CardDescription>
-              Milestone 4 will add LinkedIn OAuth and account linking.
+              Milestone 4 adds LinkedIn OAuth. Milestone 5 adds Facebook Pages.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>1. Add your Clerk keys to `.env.local` if you have not already.</p>
-            <p>2. Connect LinkedIn from the Accounts page.</p>
-            <p>3. Create and publish your first cross-platform post.</p>
+            <p>1. Connect LinkedIn from the Accounts page.</p>
+            <p>2. Create your first post in Create Post.</p>
+            <p>3. Publish to connected platforms when publishing ships.</p>
           </CardContent>
         </Card>
       </section>
