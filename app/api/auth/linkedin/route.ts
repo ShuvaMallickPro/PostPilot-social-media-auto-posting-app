@@ -2,10 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { OAUTH_STATE_COOKIE } from "@/lib/constants/platforms";
-import {
-  buildLinkedInAuthUrl,
-  getLinkedInRedirectUri,
-} from "@/lib/linkedin";
+import { buildLinkedInAuthUrl, getLinkedInRedirectUri } from "@/lib/linkedin";
 import {
   createOAuthStateCookie,
   generateOAuthState,

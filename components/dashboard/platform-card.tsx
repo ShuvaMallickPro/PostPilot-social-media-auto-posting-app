@@ -35,8 +35,12 @@ type PlatformCardProps = {
   account: ConnectedAccount;
 };
 
-function PlatformIcon({ platformId }: { platformId: PlatformDefinition["id"] }) {
-  const label = platformId === "linkedin" ? "in" : "f";
+function PlatformIcon({
+  platformId,
+}: {
+  platformId: PlatformDefinition["id"];
+}) {
+  const label = platformId === "linkedin" ? "in" : "fb";
 
   return (
     <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/40 text-sm font-bold uppercase tracking-tight text-foreground">
@@ -51,7 +55,8 @@ export function PlatformCard({ platform, account }: PlatformCardProps) {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   const handleConnect = () => {
-    window.location.href = platform.connectPath;
+    // window.location.href = platform.connectPath;
+    window.open(platform.connectPath, "_blank", "noopener,noreferrer");
   };
 
   const handleDisconnect = async () => {
@@ -154,10 +159,7 @@ export function PlatformCard({ platform, account }: PlatformCardProps) {
               Disconnect
             </Button>
           ) : (
-            <Button
-              onClick={handleConnect}
-              disabled={!platform.available}
-            >
+            <Button onClick={handleConnect} disabled={!platform.available}>
               <ExternalLinkIcon />
               Connect {platform.name}
             </Button>
@@ -170,8 +172,8 @@ export function PlatformCard({ platform, account }: PlatformCardProps) {
           <DialogHeader>
             <DialogTitle>Disconnect {platform.name}?</DialogTitle>
             <DialogDescription>
-              You will no longer be able to publish posts to {platform.name} until
-              you reconnect your account.
+              You will no longer be able to publish posts to {platform.name}{" "}
+              until you reconnect your account.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
