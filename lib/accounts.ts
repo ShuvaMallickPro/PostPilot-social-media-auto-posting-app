@@ -1,7 +1,4 @@
-import {
-  fetchLinkedInProfile,
-  getLinkedInDisplayName,
-} from "@/lib/linkedin";
+import { fetchLinkedInProfile, getLinkedInDisplayName } from "@/lib/linkedin";
 import { prisma } from "@/lib/prisma";
 import {
   PLATFORM_DEFINITIONS,
@@ -17,9 +14,7 @@ type DbAccount = {
   createdAt: Date;
 };
 
-async function resolveAccountLabel(
-  account: DbAccount,
-): Promise<string | null> {
+async function resolveAccountLabel(account: DbAccount): Promise<string | null> {
   if (account.provider === "linkedin") {
     try {
       const profile = await fetchLinkedInProfile(account.access_token);
@@ -46,7 +41,9 @@ export async function getConnectedAccountsForUser(
     },
   });
 
-  const accountMap = new Map(accounts.map((account) => [account.provider, account]));
+  const accountMap = new Map(
+    accounts.map((account) => [account.provider, account]),
+  );
 
   return Promise.all(
     PLATFORM_ORDER.map(async (platformId) => {
@@ -123,5 +120,6 @@ export async function upsertLinkedInAccount(params: {
 }
 
 export function getPlatformDefinitions() {
-  return PLATFORM_ORDER.map((id) => PLATFORM_DEFINITIONS[id]);
+  const result = PLATFORM_ORDER.map((id) => PLATFORM_DEFINITIONS[id]);
+  return result;
 }
