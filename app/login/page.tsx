@@ -1,6 +1,11 @@
 import { SignIn } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const { userId } = await auth();
+  if (userId) redirect("/");
+
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background px-4 py-12">
       <div className="pointer-events-none absolute inset-0 bg-glow-brand" />

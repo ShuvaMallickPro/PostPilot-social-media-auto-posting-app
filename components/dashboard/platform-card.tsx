@@ -55,8 +55,7 @@ export function PlatformCard({ platform, account }: PlatformCardProps) {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   const handleConnect = () => {
-    // window.location.href = platform.connectPath;
-    window.open(platform.connectPath, "_blank", "noopener,noreferrer");
+    window.location.href = platform.connectPath;
   };
 
   const handleDisconnect = async () => {
