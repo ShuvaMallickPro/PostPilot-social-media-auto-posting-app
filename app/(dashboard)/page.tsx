@@ -27,7 +27,7 @@ export default async function DashboardPage() {
         </h2>
         <p className="max-w-2xl text-base text-muted-foreground">
           Write once, publish everywhere. Connect your social accounts and start
-          scheduling posts to LinkedIn and Facebook from one dashboard.
+          scheduling posts to LinkedIn and X from one dashboard.
         </p>
         <div className="flex flex-wrap gap-3 pt-2">
           <Button render={<Link href="/create" />} nativeButton={false}>
@@ -77,7 +77,7 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              LinkedIn and Facebook connections.
+              LinkedIn and Twitter / X connections.
             </p>
           </CardContent>
         </Card>
@@ -129,11 +129,11 @@ export default async function DashboardPage() {
           <CardHeader>
             <CardTitle className="text-lg">What&apos;s next?</CardTitle>
             <CardDescription>
-              Milestone 4 adds LinkedIn OAuth. Milestone 5 adds Facebook Pages.
+              Milestone 5 adds Twitter / X OAuth (PKCE). Facebook comes later.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>1. Connect LinkedIn from the Accounts page.</p>
+            <p>1. Connect LinkedIn and Twitter / X from Accounts.</p>
             <p>2. Create your first post in Create Post.</p>
             <p>3. Publish to connected platforms when publishing ships.</p>
           </CardContent>

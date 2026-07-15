@@ -5,7 +5,7 @@ import {
   disconnectUserAccount,
   getConnectedAccountsForUser,
 } from "@/lib/accounts";
-import type { PlatformId } from "@/types/platform";
+import { isPlatformId, type PlatformId } from "@/types/platform";
 
 export async function GET() {
   const { userId } = await auth();
@@ -35,7 +35,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  if (!provider || (provider !== "linkedin" && provider !== "facebook")) {
+  if (!provider || !isPlatformId(provider)) {
     return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
   }
 

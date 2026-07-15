@@ -40,7 +40,8 @@ function PlatformIcon({
 }: {
   platformId: PlatformDefinition["id"];
 }) {
-  const label = platformId === "linkedin" ? "in" : "fb";
+  const label =
+    platformId === "linkedin" ? "in" : platformId === "twitter" ? "𝕏" : "fb";
 
   return (
     <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/40 text-sm font-bold uppercase tracking-tight text-foreground">
@@ -141,7 +142,7 @@ export function PlatformCard({ platform, account }: PlatformCardProps) {
           ) : (
             <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
               {platform.comingSoon
-                ? "Facebook connection arrives in Milestone 5."
+                ? `${platform.name} connection arrives in a later milestone.`
                 : "Connect your account to enable publishing from PostPilot."}
             </div>
           )}

@@ -58,8 +58,8 @@ export default async function AccountsPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            LinkedIn is live in Milestone 4. Facebook Page OAuth ships in
-            Milestone 5.
+            LinkedIn and Twitter / X are live. Facebook Page OAuth ships in a
+            later milestone.
           </p>
         </CardContent>
       </Card>

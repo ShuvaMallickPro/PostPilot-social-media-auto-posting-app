@@ -1,4 +1,11 @@
-import { fetchLinkedInProfile, getLinkedInDisplayName } from "@/lib/linkedin";
+import {
+  fetchLinkedInProfile,
+  getLinkedInDisplayName,
+} from "@/lib/linkedin";
+import {
+  fetchTwitterProfile,
+  getTwitterDisplayName,
+} from "@/lib/twitter";
 import { prisma } from "@/lib/prisma";
 import {
   PLATFORM_DEFINITIONS,
@@ -21,6 +28,15 @@ async function resolveAccountLabel(account: DbAccount): Promise<string | null> {
       return getLinkedInDisplayName(profile);
     } catch {
       return "LinkedIn account";
+    }
+  }
+
+  if (account.provider === "twitter") {
+    try {
+      const profile = await fetchTwitterProfile(account.access_token);
+      return getTwitterDisplayName(profile);
+    } catch {
+      return "Twitter account";
     }
   }
 
@@ -119,7 +135,43 @@ export async function upsertLinkedInAccount(params: {
   });
 }
 
+export async function upsertTwitterAccount(params: {
+  userId: string;
+  providerAccountId: string;
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt: number;
+  tokenType?: string;
+  scope?: string;
+}) {
+  return prisma.account.upsert({
+    where: {
+      provider_providerAccountId: {
+        provider: "twitter",
+        providerAccountId: params.providerAccountId,
+      },
+    },
+    update: {
+      userId: params.userId,
+      access_token: params.accessToken,
+      refresh_token: params.refreshToken,
+      expires_at: params.expiresAt,
+      token_type: params.tokenType,
+      scope: params.scope,
+    },
+    create: {
+      userId: params.userId,
+      provider: "twitter",
+      providerAccountId: params.providerAccountId,
+      access_token: params.accessToken,
+      refresh_token: params.refreshToken,
+      expires_at: params.expiresAt,
+      token_type: params.tokenType,
+      scope: params.scope,
+    },
+  });
+}
+
 export function getPlatformDefinitions() {
-  const result = PLATFORM_ORDER.map((id) => PLATFORM_DEFINITIONS[id]);
-  return result;
+  return PLATFORM_ORDER.map((id) => PLATFORM_DEFINITIONS[id]);
 }

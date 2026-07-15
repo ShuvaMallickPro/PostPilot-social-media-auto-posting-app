@@ -5,7 +5,6 @@ export function getRequestOrigin(req: NextRequest): string {
 }
 
 export function buildAppUrl(req: NextRequest, path: string): URL {
-  console.log("buildAppUrl", req.url, path);
   return new URL(path, req.url);
 }
 
