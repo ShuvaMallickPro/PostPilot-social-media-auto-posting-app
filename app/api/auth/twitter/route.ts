@@ -11,10 +11,7 @@ import {
 } from "@/lib/oauth/cookies";
 import { generatePkcePair } from "@/lib/oauth/pkce";
 import { buildAppUrl, redirectToAccounts } from "@/lib/oauth/redirect";
-import {
-  buildTwitterAuthUrl,
-  getTwitterRedirectUri,
-} from "@/lib/twitter";
+import { buildTwitterAuthUrl, getTwitterRedirectUri } from "@/lib/twitter";
 
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
