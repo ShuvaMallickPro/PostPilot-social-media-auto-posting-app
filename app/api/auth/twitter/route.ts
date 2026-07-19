@@ -15,7 +15,6 @@ import { buildTwitterAuthUrl, getTwitterRedirectUri } from "@/lib/twitter";
 
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
-  // const userId = "user_2sJbYt74vplLJ9Xa";
 
   if (!userId) {
     return NextResponse.redirect(
@@ -43,6 +42,7 @@ export async function GET(req: NextRequest) {
   });
 
   const response = NextResponse.redirect(twitterUrl);
+
   response.cookies.set(
     createOAuthStateCookie(OAUTH_STATE_COOKIE.twitter, state),
   );
