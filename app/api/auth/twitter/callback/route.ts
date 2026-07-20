@@ -37,9 +37,7 @@ export async function GET(req: NextRequest) {
 
   if (!code) {
     return clearOAuthCookies(
-      NextResponse.redirect(
-        redirectToAccounts(req, { error: "missing_code" }),
-      ),
+      NextResponse.redirect(redirectToAccounts(req, { error: "missing_code" })),
     );
   }
 
@@ -94,16 +92,13 @@ export async function GET(req: NextRequest) {
     });
 
     return clearOAuthCookies(
-      NextResponse.redirect(
-        redirectToAccounts(req, { success: "twitter" }),
-      ),
+      NextResponse.redirect(redirectToAccounts(req, { success: "twitter" })),
     );
   } catch (error) {
     console.error("Twitter OAuth callback failed:", error);
 
     const errorCode =
-      error instanceof Error &&
-      error.message.toLowerCase().includes("profile")
+      error instanceof Error && error.message.toLowerCase().includes("profile")
         ? "profile_fetch_failed"
         : "token_exchange_failed";
 
