@@ -71,7 +71,10 @@ export function buildUploadObjectKey(userId: string, filename: string): string {
   return `uploads/${userId}/${Date.now()}-${safeName}`;
 }
 
-export function buildPublicObjectUrl(publicBaseUrl: string, key: string): string {
+export function buildPublicObjectUrl(
+  publicBaseUrl: string,
+  key: string,
+): string {
   return `${publicBaseUrl.replace(/\/$/, "")}/${key}`;
 }
 
