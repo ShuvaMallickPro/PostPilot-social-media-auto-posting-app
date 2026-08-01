@@ -1,5 +1,6 @@
 import { PenSquareIcon } from "lucide-react";
 
+import { PostEditor } from "@/components/dashboard/post-editor";
 import {
   Card,
   CardContent,
@@ -17,14 +18,12 @@ export default function CreatePostPage() {
           Create Post
         </CardTitle>
         <CardDescription>
-          The post editor will be built in a later milestone. Use this route to
-          verify navigation and layout.
+          Write once, attach an optional image, then publish to your connected
+          platforms.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-lg border border-dashed border-border bg-muted/30 px-6 py-16 text-center text-sm text-muted-foreground">
-          Post editor coming soon
-        </div>
+        <PostEditor />
       </CardContent>
     </Card>
   );

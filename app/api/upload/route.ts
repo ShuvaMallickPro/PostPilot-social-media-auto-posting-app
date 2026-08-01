@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
+import { ALLOWED_UPLOAD_MIME_TYPES } from "@/lib/constants/posts";
 import {
   buildPublicObjectUrl,
   buildUploadObjectKey,
@@ -8,13 +9,7 @@ import {
   getR2Config,
 } from "@/lib/r2";
 
-const ALLOWED_IMAGE_TYPES = new Set([
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-]);
+const ALLOWED_IMAGE_TYPES = new Set<string>(ALLOWED_UPLOAD_MIME_TYPES);
 
 type UploadRequestBody = {
   filename?: string;
@@ -42,7 +37,10 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as UploadRequestBody;
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 },
+    );
   }
 
   const filename = body.filename?.trim();
