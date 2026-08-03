@@ -197,10 +197,12 @@ export function PostEditor() {
 
       toast.success("Post saved successfully.");
       setContent("");
+
       clearImage();
       setSelectedPlatforms(AVAILABLE_PLATFORMS);
     } catch (error) {
       console.error(error);
+
       toast.error(
         error instanceof Error ? error.message : "Failed to publish post.",
       );
