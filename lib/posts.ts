@@ -49,7 +49,13 @@ export function validateCreatePostBody(body: unknown): ValidationResult {
     }
 
     const trimmed = record.imageUrl.trim();
-    imageUrl = trimmed.length > 0 ? trimmed : null;
+    if (trimmed.length === 0) {
+      imageUrl = null;
+    } else if (!trimmed.startsWith("https://")) {
+      return { ok: false, error: "imageUrl must be a valid HTTPS URL" };
+    } else {
+      imageUrl = trimmed;
+    }
   }
 
   if (!Array.isArray(record.platforms) || record.platforms.length === 0) {
