@@ -1,6 +1,12 @@
 const TWITTER_AUTH_URL = "https://twitter.com/i/oauth2/authorize";
 const TWITTER_TOKEN_URL = "https://api.x.com/2/oauth2/token";
 const TWITTER_USERS_ME_URL = "https://api.x.com/2/users/me";
+const TWITTER_TWEETS_URL = "https://api.x.com/2/tweets";
+const TWITTER_MEDIA_UPLOAD_URL =
+  "https://upload.twitter.com/1.1/media/upload.json";
+
+/** X free/basic tweet text ceiling for MVP (LinkedIn editor allows 3000). */
+export const TWITTER_POST_MAX_LENGTH = 280;
 
 export const TWITTER_SCOPES = [
   "tweet.read",
@@ -116,4 +122,174 @@ export function getTwitterDisplayName(profile: TwitterProfile): string {
   if (profile.name?.trim()) return profile.name.trim();
   if (profile.username?.trim()) return `@${profile.username.trim()}`;
   return "Twitter account";
+}
+
+/** Minimal account fields required to publish (from Prisma Account). */
+export type TwitterPublishAccount = {
+  access_token: string;
+};
+
+export type TwitterPublishResult =
+  | { success: true; postId: string }
+  | { success: false; error: string };
+
+function mapTwitterPublishError(status: number, body: string): string {
+  if (status === 401) {
+    return "Twitter / X token expired. Reconnect your account.";
+  }
+
+  if (status === 403) {
+    return (
+      "Twitter / X rejected the post (403). Check app permissions and API tier — " +
+      "tweet.write often requires a paid Basic plan."
+    );
+  }
+
+  const trimmed = body.trim();
+  return trimmed || `Twitter / X publish failed (${status})`;
+}
+
+/**
+ * Simple image upload (< ~5MB) via v1.1 media endpoint using the user OAuth 2.0 token.
+ * Chunked INIT/APPEND/FINALIZE can be added later for large videos.
+ */
+async function uploadTwitterMedia(
+  accessToken: string,
+  imageUrl: string,
+): Promise<string> {
+  const imageResponse = await fetch(imageUrl, { cache: "no-store" });
+
+  if (!imageResponse.ok) {
+    throw new Error("Failed to download image for Twitter upload");
+  }
+
+  const contentType =
+    imageResponse.headers.get("content-type") ?? "application/octet-stream";
+  const bytes = await imageResponse.arrayBuffer();
+  const extension = contentType.includes("png")
+    ? "png"
+    : contentType.includes("gif")
+      ? "gif"
+      : contentType.includes("webp")
+        ? "webp"
+        : "jpg";
+
+  const form = new FormData();
+  form.append(
+    "media",
+    new Blob([bytes], { type: contentType }),
+    `upload.${extension}`,
+  );
+
+  const response = await fetch(TWITTER_MEDIA_UPLOAD_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: form,
+  });
+
+  const raw = await response.text();
+
+  if (!response.ok) {
+    throw new Error(mapTwitterPublishError(response.status, raw));
+  }
+
+  const data = JSON.parse(raw) as {
+    media_id_string?: string;
+    media_id?: number;
+  };
+
+  const mediaId =
+    data.media_id_string ??
+    (data.media_id != null ? String(data.media_id) : undefined);
+
+  if (!mediaId) {
+    throw new Error("Twitter did not return a media id");
+  }
+
+  return mediaId;
+}
+
+/**
+ * Publish text (and optional image) as a tweet.
+ * Returns the same success shape as LinkedIn (`postId`) for the Step 21 orchestrator.
+ */
+export async function publishToTwitter(
+  account: TwitterPublishAccount,
+  content: string,
+  imageUrl?: string | null,
+): Promise<TwitterPublishResult> {
+  const trimmed = content.trim();
+
+  if (!trimmed) {
+    return { success: false, error: "Post content is required" };
+  }
+
+  if (trimmed.length > TWITTER_POST_MAX_LENGTH) {
+    return {
+      success: false,
+      error: `Twitter / X posts must be at most ${TWITTER_POST_MAX_LENGTH} characters`,
+    };
+  }
+
+  if (!account.access_token) {
+    return { success: false, error: "Twitter / X account is incomplete" };
+  }
+
+  try {
+    let mediaId: string | undefined;
+
+    if (imageUrl?.trim()) {
+      mediaId = await uploadTwitterMedia(account.access_token, imageUrl.trim());
+    }
+
+    const body: {
+      text: string;
+      media?: { media_ids: string[] };
+    } = { text: trimmed };
+
+    if (mediaId) {
+      body.media = { media_ids: [mediaId] };
+    }
+
+    const response = await fetch(TWITTER_TWEETS_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${account.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const raw = await response.text();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: mapTwitterPublishError(response.status, raw),
+      };
+    }
+
+    const data = JSON.parse(raw) as { data?: { id?: string } };
+    const tweetId = data.data?.id;
+
+    if (!tweetId) {
+      return { success: false, error: "Twitter did not return a tweet id" };
+    }
+
+    return { success: true, postId: tweetId };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Twitter / X publish failed";
+
+    if (message.toLowerCase().includes("token expired")) {
+      return {
+        success: false,
+        error: "Twitter / X token expired. Reconnect your account.",
+      };
+    }
+
+    return { success: false, error: message };
+  }
 }
