@@ -1,5 +1,7 @@
 import { HistoryIcon } from "lucide-react";
+import { auth } from "@clerk/nextjs/server";
 
+import { PostHistoryList } from "@/components/dashboard/post-history-list";
 import {
   Card,
   CardContent,
@@ -7,8 +9,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { listPostsForUser, toHistoryPosts } from "@/lib/posts";
 
-export default function HistoryPage() {
+export default async function HistoryPage() {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return null;
+  }
+
+  const posts = toHistoryPosts(await listPostsForUser(userId));
+
   return (
     <Card className="border-border/80 bg-card/80 backdrop-blur-sm">
       <CardHeader>
@@ -17,14 +28,12 @@ export default function HistoryPage() {
           Post History
         </CardTitle>
         <CardDescription>
-          Published and failed posts will appear here once publishing is
-          implemented.
+          Drafts and publish results for your posts, including per-platform
+          status.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-lg border border-dashed border-border bg-muted/30 px-6 py-16 text-center text-sm text-muted-foreground">
-          No posts yet
-        </div>
+        <PostHistoryList posts={posts} />
       </CardContent>
     </Card>
   );

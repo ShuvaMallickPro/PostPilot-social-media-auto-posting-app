@@ -127,6 +127,27 @@ export async function listPostsForUser(userId: string) {
   });
 }
 
+/** Serialize Prisma posts for client History UI (ISO date strings). */
+export function toHistoryPosts(
+  posts: Awaited<ReturnType<typeof listPostsForUser>>,
+) {
+  return posts.map((post) => ({
+    id: post.id,
+    content: post.content,
+    imageUrl: post.imageUrl,
+    status: post.status,
+    createdAt: post.createdAt.toISOString(),
+    updatedAt: post.updatedAt.toISOString(),
+    platforms: post.platforms.map((platform) => ({
+      id: platform.id,
+      platform: platform.platform,
+      status: platform.status,
+      publishedAt: platform.publishedAt?.toISOString() ?? null,
+      error: platform.error,
+    })),
+  }));
+}
+
 export type PublishPostResult =
   | {
       ok: true;

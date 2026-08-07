@@ -21,6 +21,21 @@ export const POST_PLATFORM_STATUS = {
 export type PostPlatformStatus =
   (typeof POST_PLATFORM_STATUS)[keyof typeof POST_PLATFORM_STATUS];
 
+export const POST_STATUS_LABELS: Record<PostStatus, string> = {
+  draft: "Draft",
+  publishing: "Publishing",
+  published: "Published",
+  failed: "Failed",
+};
+
+export const POST_PLATFORM_STATUS_LABELS: Record<PostPlatformStatus, string> = {
+  pending: "Pending",
+  published: "Published",
+  failed: "Failed",
+};
+
+export const HISTORY_CONTENT_PREVIEW_LENGTH = 140;
+
 export const ALLOWED_UPLOAD_MIME_TYPES = [
   "image/jpeg",
   "image/jpg",
@@ -30,3 +45,15 @@ export const ALLOWED_UPLOAD_MIME_TYPES = [
 ] as const;
 
 export type AllowedUploadMimeType = (typeof ALLOWED_UPLOAD_MIME_TYPES)[number];
+
+export function isPostStatus(value: string): value is PostStatus {
+  return Object.values(POST_STATUS).includes(value as PostStatus);
+}
+
+export function isPostPlatformStatus(
+  value: string,
+): value is PostPlatformStatus {
+  return Object.values(POST_PLATFORM_STATUS).includes(
+    value as PostPlatformStatus,
+  );
+}
