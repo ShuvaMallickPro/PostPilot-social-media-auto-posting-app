@@ -14,9 +14,16 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const accounts = await getConnectedAccountsForUser(userId);
-
-  return NextResponse.json({ accounts });
+  try {
+    const accounts = await getConnectedAccountsForUser(userId);
+    return NextResponse.json({ accounts });
+  } catch (error) {
+    console.error("Failed to list accounts:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch accounts" },
+      { status: 500 },
+    );
+  }
 }
 
 export async function DELETE(req: Request) {
@@ -32,7 +39,10 @@ export async function DELETE(req: Request) {
     const body = (await req.json()) as { provider?: PlatformId };
     provider = body.provider;
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 },
+    );
   }
 
   if (!provider || !isPlatformId(provider)) {
@@ -43,10 +53,7 @@ export async function DELETE(req: Request) {
     const disconnected = await disconnectUserAccount(userId, provider);
 
     if (!disconnected) {
-      return NextResponse.json(
-        { error: "Account not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
 
     return NextResponse.json({ success: true });
