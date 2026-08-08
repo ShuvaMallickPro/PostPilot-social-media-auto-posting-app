@@ -1,6 +1,7 @@
 "use client";
 
 import { ImagePlusIcon, Loader2Icon, SendIcon, XIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import {
   useEffect,
   useId,
@@ -16,12 +17,14 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ALLOWED_UPLOAD_MIME_TYPES,
   POST_CONTENT_MAX_LENGTH,
+  POST_PLATFORM_STATUS,
 } from "@/lib/constants/posts";
 import {
   PLATFORM_DEFINITIONS,
   PLATFORM_ORDER,
 } from "@/lib/constants/platforms";
 import { cn } from "@/lib/utils";
+import type { HistoryPost } from "@/types/history";
 import type { PlatformId } from "@/types/platform";
 
 type UploadApiResponse = {
@@ -30,8 +33,15 @@ type UploadApiResponse = {
   error?: string;
 };
 
-type PublishApiResponse = {
+type CreatePostApiResponse = {
   error?: string;
+  post?: { id: string };
+};
+
+type PublishApiResponse = {
+  success?: boolean;
+  error?: string;
+  post?: HistoryPost;
 };
 
 const AVAILABLE_PLATFORMS = PLATFORM_ORDER.filter(
@@ -72,6 +82,7 @@ async function uploadImageToR2(file: File): Promise<string> {
 }
 
 export function PostEditor() {
+  const router = useRouter();
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -172,7 +183,7 @@ export function PostEditor() {
     setIsPublishing(true);
 
     try {
-      const response = await fetch("/api/posts", {
+      const createResponse = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -182,24 +193,47 @@ export function PostEditor() {
         }),
       });
 
-      const data = (await response
+      const createData = (await createResponse
+        .json()
+        .catch(() => ({}))) as CreatePostApiResponse;
+
+      if (!createResponse.ok || !createData.post?.id) {
+        throw new Error(createData.error ?? "Failed to save post.");
+      }
+
+      const publishResponse = await fetch(
+        `/api/posts/${createData.post.id}/publish`,
+        { method: "POST" },
+      );
+
+      const publishData = (await publishResponse
         .json()
         .catch(() => ({}))) as PublishApiResponse;
 
-      if (!response.ok) {
+      if (!publishResponse.ok) {
         throw new Error(
-          data.error ??
-            (response.status === 404
-              ? "Posts API is not ready yet (Step 18)."
-              : "Failed to publish post."),
+          publishData.error ??
+            "Post was saved, but publishing failed. Retry from History.",
         );
       }
 
-      toast.success("Post saved successfully.");
-      setContent("");
+      if (publishData.success) {
+        toast.success("Published to your connected platforms.");
+      } else {
+        const firstError = publishData.post?.platforms.find(
+          (row) => row.status === POST_PLATFORM_STATUS.failed && row.error,
+        )?.error;
+        toast.error(
+          firstError ??
+            "Post saved, but some platforms failed. Retry from History.",
+        );
+      }
 
+      setContent("");
       clearImage();
       setSelectedPlatforms(AVAILABLE_PLATFORMS);
+      router.push("/history");
+      router.refresh();
     } catch (error) {
       console.error(error);
 

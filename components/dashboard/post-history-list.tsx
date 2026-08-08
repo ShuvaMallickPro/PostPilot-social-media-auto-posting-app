@@ -5,8 +5,12 @@ import {
   EyeIcon,
   HistoryIcon,
   ImageIcon,
+  Loader2Icon,
+  SendIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +37,12 @@ import { isPlatformId } from "@/types/platform";
 
 type PostHistoryListProps = {
   posts: HistoryPost[];
+};
+
+type PublishApiResponse = {
+  success?: boolean;
+  error?: string;
+  post?: HistoryPost;
 };
 
 function formatPostDate(iso: string): string {
@@ -89,6 +99,14 @@ function platformShortLabel(platform: string): string {
   return platform.slice(0, 2);
 }
 
+function canPublishPost(post: HistoryPost): boolean {
+  return post.platforms.some(
+    (row) =>
+      row.status === POST_PLATFORM_STATUS.pending ||
+      row.status === POST_PLATFORM_STATUS.failed,
+  );
+}
+
 function PlatformStatusChip({ row }: { row: HistoryPlatformRow }) {
   const title =
     row.status === POST_PLATFORM_STATUS.failed && row.error
@@ -103,7 +121,9 @@ function PlatformStatusChip({ row }: { row: HistoryPlatformRow }) {
       <span className="flex size-5 items-center justify-center rounded-md border border-border bg-background text-[10px] font-bold uppercase">
         {platformShortLabel(row.platform)}
       </span>
-      <span className="hidden sm:inline">{platformDisplayName(row.platform)}</span>
+      <span className="hidden sm:inline">
+        {platformDisplayName(row.platform)}
+      </span>
       <Badge variant={platformStatusBadgeVariant(row.status)}>
         {platformStatusLabel(row.status)}
       </Badge>
@@ -136,7 +156,51 @@ function FailedErrors({ platforms }: { platforms: HistoryPlatformRow[] }) {
 }
 
 export function PostHistoryList({ posts }: PostHistoryListProps) {
+  const router = useRouter();
   const [selected, setSelected] = useState<HistoryPost | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+
+  const handlePublish = async (post: HistoryPost) => {
+    setPublishingId(post.id);
+
+    try {
+      const response = await fetch(`/api/posts/${post.id}/publish`, {
+        method: "POST",
+      });
+
+      const data = (await response
+        .json()
+        .catch(() => ({}))) as PublishApiResponse;
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to publish post");
+      }
+
+      if (data.success) {
+        toast.success("Published to your connected platforms.");
+      } else {
+        const firstError = data.post?.platforms.find(
+          (row) => row.status === POST_PLATFORM_STATUS.failed && row.error,
+        )?.error;
+        toast.error(
+          firstError ?? "Publish finished with errors. Check status.",
+        );
+      }
+
+      if (selected?.id === post.id && data.post) {
+        setSelected(data.post);
+      }
+
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to publish post.",
+      );
+    } finally {
+      setPublishingId(null);
+    }
+  };
 
   if (posts.length === 0) {
     return (
@@ -144,7 +208,7 @@ export function PostHistoryList({ posts }: PostHistoryListProps) {
         <HistoryIcon className="mx-auto size-8 text-muted-foreground/70" />
         <p className="mt-3 text-sm font-medium text-foreground">No posts yet</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Create a draft on the Create page — it will show up here with status.
+          Create a post on the Create page — it will show up here with status.
         </p>
       </div>
     );
@@ -153,60 +217,88 @@ export function PostHistoryList({ posts }: PostHistoryListProps) {
   return (
     <>
       <ul className="space-y-3">
-        {posts.map((post) => (
-          <li
-            key={post.id}
-            className={cn(
-              "rounded-xl border border-border/80 bg-card/60 p-4 shadow-xs",
-              post.status === POST_STATUS.failed && "border-destructive/40",
-            )}
-          >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0 flex-1 space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={postStatusBadgeVariant(post.status)}>
-                    {postStatusLabel(post.status)}
-                  </Badge>
-                  <time
-                    dateTime={post.createdAt}
-                    className="text-xs text-muted-foreground"
-                  >
-                    {formatPostDate(post.createdAt)}
-                  </time>
-                  {post.imageUrl ? (
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      <ImageIcon className="size-3.5" />
-                      Image
-                    </span>
+        {posts.map((post) => {
+          const showPublish = canPublishPost(post);
+          const isPublishing = publishingId === post.id;
+
+          return (
+            <li
+              key={post.id}
+              className={cn(
+                "rounded-xl border border-border/80 bg-card/60 p-4 shadow-xs",
+                post.status === POST_STATUS.failed && "border-destructive/40",
+              )}
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={postStatusBadgeVariant(post.status)}>
+                      {postStatusLabel(post.status)}
+                    </Badge>
+                    <time
+                      dateTime={post.createdAt}
+                      className="text-xs text-muted-foreground"
+                    >
+                      {formatPostDate(post.createdAt)}
+                    </time>
+                    {post.imageUrl ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <ImageIcon className="size-3.5" />
+                        Image
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                    {previewContent(post.content)}
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    {post.platforms.map((row) => (
+                      <PlatformStatusChip key={row.id} row={row} />
+                    ))}
+                  </div>
+
+                  <FailedErrors platforms={post.platforms} />
+                </div>
+
+                <div className="flex shrink-0 flex-wrap gap-2 self-start">
+                  {showPublish ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={isPublishing || publishingId !== null}
+                      onClick={() => void handlePublish(post)}
+                    >
+                      {isPublishing ? (
+                        <>
+                          <Loader2Icon className="size-4 animate-spin" />
+                          Publishing…
+                        </>
+                      ) : (
+                        <>
+                          <SendIcon className="size-4" />
+                          {post.status === POST_STATUS.failed
+                            ? "Retry publish"
+                            : "Publish"}
+                        </>
+                      )}
+                    </Button>
                   ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelected(post)}
+                  >
+                    <EyeIcon className="size-4" />
+                    View
+                  </Button>
                 </div>
-
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                  {previewContent(post.content)}
-                </p>
-
-                <div className="flex flex-wrap gap-2">
-                  {post.platforms.map((row) => (
-                    <PlatformStatusChip key={row.id} row={row} />
-                  ))}
-                </div>
-
-                <FailedErrors platforms={post.platforms} />
               </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="shrink-0 self-start"
-                onClick={() => setSelected(post)}
-              >
-                <EyeIcon className="size-4" />
-                View
-              </Button>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
 
       <Dialog
@@ -254,6 +346,29 @@ export function PostHistoryList({ posts }: PostHistoryListProps) {
                   </div>
                   <FailedErrors platforms={selected.platforms} />
                 </div>
+
+                {canPublishPost(selected) ? (
+                  <Button
+                    type="button"
+                    className="w-full"
+                    disabled={publishingId !== null}
+                    onClick={() => void handlePublish(selected)}
+                  >
+                    {publishingId === selected.id ? (
+                      <>
+                        <Loader2Icon className="animate-spin" />
+                        Publishing…
+                      </>
+                    ) : (
+                      <>
+                        <SendIcon />
+                        {selected.status === POST_STATUS.failed
+                          ? "Retry publish"
+                          : "Publish to networks"}
+                      </>
+                    )}
+                  </Button>
+                ) : null}
               </div>
             </>
           ) : null}

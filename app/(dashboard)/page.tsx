@@ -1,5 +1,10 @@
 import { currentUser } from "@clerk/nextjs/server";
-import { ArrowUpRightIcon, Link2Icon, PenSquareIcon, SendIcon } from "lucide-react";
+import {
+  ArrowUpRightIcon,
+  Link2Icon,
+  PenSquareIcon,
+  SendIcon,
+} from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +24,10 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <section className="space-y-3">
-        <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+        <Badge
+          variant="outline"
+          className="border-primary/30 bg-primary/10 text-primary"
+        >
           Milestone 3 complete
         </Badge>
         <h2 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
@@ -134,8 +142,8 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>1. Connect LinkedIn and Twitter / X from Accounts.</p>
-            <p>2. Create your first post in Create Post.</p>
-            <p>3. Publish to connected platforms when publishing ships.</p>
+            <p>2. Create a post — Publish Now saves and posts to networks.</p>
+            <p>3. Review results (or retry) on the History page.</p>
           </CardContent>
         </Card>
       </section>

@@ -231,8 +231,8 @@ async function publishPlatformRow(input: {
 }
 
 /**
- * Orchestrates parallel publish to each pending platform (LinkedIn + Twitter).
- * Updates PostPlatform rows and overall Post status.
+ * Orchestrates parallel publish to pending/failed platforms (LinkedIn + Twitter).
+ * Updates PostPlatform rows and overall Post status. Supports retry after failure.
  */
 export async function publishPostForUser(
   userId: string,
@@ -244,11 +244,13 @@ export async function publishPostForUser(
     return { ok: false, error: "Not found", status: 404 };
   }
 
-  const pendingPlatforms = post.platforms.filter(
-    (pp) => pp.status === POST_PLATFORM_STATUS.pending,
+  const publishablePlatforms = post.platforms.filter(
+    (pp) =>
+      pp.status === POST_PLATFORM_STATUS.pending ||
+      pp.status === POST_PLATFORM_STATUS.failed,
   );
 
-  if (pendingPlatforms.length === 0) {
+  if (publishablePlatforms.length === 0) {
     const alreadyDone = post.platforms.every(
       (pp) => pp.status === POST_PLATFORM_STATUS.published,
     );
@@ -259,10 +261,22 @@ export async function publishPostForUser(
 
     return {
       ok: false,
-      error: "No pending platforms to publish",
+      error: "No platforms left to publish",
       status: 400,
     };
   }
+
+  // Clear prior errors so History shows a clean retry attempt.
+  await prisma.postPlatform.updateMany({
+    where: {
+      id: { in: publishablePlatforms.map((pp) => pp.id) },
+    },
+    data: {
+      status: POST_PLATFORM_STATUS.pending,
+      error: null,
+      publishedAt: null,
+    },
+  });
 
   await prisma.post.update({
     where: { id: postId },
@@ -279,7 +293,7 @@ export async function publishPostForUser(
   });
 
   const settled = await Promise.allSettled(
-    pendingPlatforms.map((pp) =>
+    publishablePlatforms.map((pp) =>
       publishPlatformRow({
         platformRowId: pp.id,
         platform: pp.platform,
@@ -295,7 +309,7 @@ export async function publishPostForUser(
       return result.value;
     }
 
-    const platform = pendingPlatforms[index]?.platform ?? "unknown";
+    const platform = publishablePlatforms[index]?.platform ?? "unknown";
     const message =
       result.reason instanceof Error ? result.reason.message : "Publish failed";
 

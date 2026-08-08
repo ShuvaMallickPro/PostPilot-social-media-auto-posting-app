@@ -58,8 +58,9 @@ export default async function AccountsPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            LinkedIn and Twitter / X are live. Facebook Page OAuth ships in a
-            later milestone.
+            LinkedIn and Twitter / X are live. After adding new X scopes
+            (like media.write), disconnect and reconnect Twitter / X so
+            posting with images works. Facebook Page OAuth ships later.
           </p>
         </CardContent>
       </Card>

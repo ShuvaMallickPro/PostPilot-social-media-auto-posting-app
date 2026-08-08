@@ -2,8 +2,8 @@ const TWITTER_AUTH_URL = "https://twitter.com/i/oauth2/authorize";
 const TWITTER_TOKEN_URL = "https://api.x.com/2/oauth2/token";
 const TWITTER_USERS_ME_URL = "https://api.x.com/2/users/me";
 const TWITTER_TWEETS_URL = "https://api.x.com/2/tweets";
-const TWITTER_MEDIA_UPLOAD_URL =
-  "https://upload.twitter.com/1.1/media/upload.json";
+/** v1.1 media upload is deprecated; v2 requires OAuth 2.0 + media.write. */
+const TWITTER_MEDIA_UPLOAD_URL = "https://api.x.com/2/media/upload";
 
 /** X free/basic tweet text ceiling for MVP (LinkedIn editor allows 3000). */
 export const TWITTER_POST_MAX_LENGTH = 280;
@@ -13,7 +13,10 @@ export const TWITTER_SCOPES = [
   "tweet.write",
   "users.read",
   "offline.access",
+  "media.write",
 ] as const;
+
+const MEDIA_APPEND_CHUNK_BYTES = 4 * 1024 * 1024;
 
 export type TwitterTokenResponse = {
   access_token: string;
@@ -134,24 +137,82 @@ export type TwitterPublishResult =
   | { success: false; error: string };
 
 function mapTwitterPublishError(status: number, body: string): string {
+  let detail = "";
+
+  try {
+    const parsed = JSON.parse(body) as {
+      detail?: string;
+      title?: string;
+      error?: string;
+      errors?: Array<{ message?: string }>;
+    };
+    detail =
+      parsed.detail ??
+      parsed.title ??
+      parsed.error ??
+      parsed.errors?.[0]?.message ??
+      "";
+  } catch {
+    detail = body.trim();
+  }
+
   if (status === 401) {
     return "Twitter / X token expired. Reconnect your account.";
   }
 
   if (status === 403) {
-    return (
-      "Twitter / X rejected the post (403). Check app permissions and API tier — " +
-      "tweet.write often requires a paid Basic plan."
-    );
+    const hint =
+      "Common fixes: (1) Disconnect & reconnect Twitter so media.write is granted, " +
+      "(2) Developer Portal app must be Read and write, " +
+      "(3) Posting often needs a paid X API Basic plan.";
+    return detail
+      ? `Twitter / X rejected the request (403): ${detail}. ${hint}`
+      : `Twitter / X rejected the request (403). ${hint}`;
   }
 
-  const trimmed = body.trim();
-  return trimmed || `Twitter / X publish failed (${status})`;
+  return detail || `Twitter / X publish failed (${status})`;
+}
+
+function resolveMediaCategory(contentType: string): string {
+  if (contentType.includes("gif")) return "tweet_gif";
+  return "tweet_image";
+}
+
+async function twitterMediaJson(
+  accessToken: string,
+  body: Record<string, string | number>,
+): Promise<{ id: string; raw: string; status: number }> {
+  const response = await fetch(TWITTER_MEDIA_UPLOAD_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const raw = await response.text();
+
+  if (!response.ok) {
+    throw new Error(mapTwitterPublishError(response.status, raw));
+  }
+
+  const data = JSON.parse(raw) as {
+    data?: { id?: string };
+    media_id_string?: string;
+  };
+  const id = data.data?.id ?? data.media_id_string;
+
+  if (!id) {
+    throw new Error("Twitter media upload did not return an id");
+  }
+
+  return { id, raw, status: response.status };
 }
 
 /**
- * Simple image upload (< ~5MB) via v1.1 media endpoint using the user OAuth 2.0 token.
- * Chunked INIT/APPEND/FINALIZE can be added later for large videos.
+ * Upload an image via X API v2 (INIT → APPEND → FINALIZE).
+ * Requires OAuth 2.0 user token with media.write (reconnect after scope add).
  */
 async function uploadTwitterMedia(
   accessToken: string,
@@ -164,48 +225,88 @@ async function uploadTwitterMedia(
   }
 
   const contentType =
-    imageResponse.headers.get("content-type") ?? "application/octet-stream";
-  const bytes = await imageResponse.arrayBuffer();
-  const extension = contentType.includes("png")
-    ? "png"
-    : contentType.includes("gif")
-      ? "gif"
-      : contentType.includes("webp")
-        ? "webp"
-        : "jpg";
+    imageResponse.headers.get("content-type")?.split(";")[0]?.trim() ||
+    "application/octet-stream";
+  const bytes = Buffer.from(await imageResponse.arrayBuffer());
+  const mediaCategory = resolveMediaCategory(contentType);
 
-  const form = new FormData();
-  form.append(
-    "media",
-    new Blob([bytes], { type: contentType }),
-    `upload.${extension}`,
-  );
-
-  const response = await fetch(TWITTER_MEDIA_UPLOAD_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: form,
+  const initialized = await twitterMediaJson(accessToken, {
+    command: "INIT",
+    media_type: contentType,
+    total_bytes: bytes.byteLength,
+    media_category: mediaCategory,
   });
 
-  const raw = await response.text();
+  const mediaId = initialized.id;
 
-  if (!response.ok) {
-    throw new Error(mapTwitterPublishError(response.status, raw));
+  for (
+    let offset = 0, segmentIndex = 0;
+    offset < bytes.byteLength;
+    offset += MEDIA_APPEND_CHUNK_BYTES, segmentIndex += 1
+  ) {
+    const chunk = bytes.subarray(offset, offset + MEDIA_APPEND_CHUNK_BYTES);
+    const form = new FormData();
+    form.append("command", "APPEND");
+    form.append("media_id", mediaId);
+    form.append("segment_index", String(segmentIndex));
+    form.append(
+      "media",
+      new Blob([new Uint8Array(chunk)], { type: contentType }),
+      `chunk-${segmentIndex}`,
+    );
+
+    const appendResponse = await fetch(TWITTER_MEDIA_UPLOAD_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form,
+    });
+
+    if (!appendResponse.ok) {
+      const raw = await appendResponse.text();
+      throw new Error(mapTwitterPublishError(appendResponse.status, raw));
+    }
   }
 
-  const data = JSON.parse(raw) as {
-    media_id_string?: string;
-    media_id?: number;
-  };
+  const finalized = await twitterMediaJson(accessToken, {
+    command: "FINALIZE",
+    media_id: mediaId,
+  });
 
-  const mediaId =
-    data.media_id_string ??
-    (data.media_id != null ? String(data.media_id) : undefined);
+  // Images are usually ready immediately; poll briefly if processing_info appears.
+  try {
+    const finalizePayload = JSON.parse(finalized.raw) as {
+      data?: {
+        processing_info?: {
+          state?: string;
+          check_after_secs?: number;
+        };
+      };
+    };
+    const processing = finalizePayload.data?.processing_info;
 
-  if (!mediaId) {
-    throw new Error("Twitter did not return a media id");
+    if (processing?.state && processing.state !== "succeeded") {
+      const waitMs = Math.max(1, processing.check_after_secs ?? 1) * 1000;
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+
+      const statusUrl = new URL(TWITTER_MEDIA_UPLOAD_URL);
+      statusUrl.searchParams.set("command", "STATUS");
+      statusUrl.searchParams.set("media_id", mediaId);
+
+      const statusResponse = await fetch(statusUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: "no-store",
+      });
+
+      if (!statusResponse.ok) {
+        const raw = await statusResponse.text();
+        throw new Error(mapTwitterPublishError(statusResponse.status, raw));
+      }
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("403")) {
+      throw error;
+    }
+    // Non-fatal if STATUS parse fails for simple images.
   }
 
   return mediaId;

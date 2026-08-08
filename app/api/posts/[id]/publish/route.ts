@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-import { publishPostForUser } from "@/lib/posts";
+import { publishPostForUser, toHistoryPosts } from "@/lib/posts";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -32,7 +32,9 @@ export async function POST(_req: Request, context: RouteContext) {
 
     return NextResponse.json({
       success: result.allSucceeded,
-      post: result.post,
+      post: result.post
+        ? toHistoryPosts([result.post])[0]
+        : null,
     });
   } catch (error) {
     console.error("Failed to publish post:", error);
