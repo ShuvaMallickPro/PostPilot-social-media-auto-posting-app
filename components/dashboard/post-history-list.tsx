@@ -8,6 +8,7 @@ import {
   Loader2Icon,
   SendIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -138,19 +139,37 @@ function FailedErrors({ platforms }: { platforms: HistoryPlatformRow[] }) {
 
   if (failed.length === 0) return null;
 
+  const needsReconnect = failed.some((row) =>
+    (row.error ?? "").toLowerCase().includes("reconnect"),
+  );
+
   return (
-    <div className="space-y-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-      {failed.map((row) => (
-        <p key={row.id} className="flex gap-2">
-          <AlertCircleIcon className="mt-0.5 size-3.5 shrink-0" />
-          <span>
-            <span className="font-medium">
-              {platformDisplayName(row.platform)}:
-            </span>{" "}
-            {row.error}
-          </span>
+    <div className="space-y-2">
+      <div className="space-y-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+        {failed.map((row) => (
+          <p key={row.id} className="flex gap-2">
+            <AlertCircleIcon className="mt-0.5 size-3.5 shrink-0" />
+            <span>
+              <span className="font-medium">
+                {platformDisplayName(row.platform)}:
+              </span>{" "}
+              {row.error}
+            </span>
+          </p>
+        ))}
+      </div>
+      {needsReconnect ? (
+        <p className="text-xs text-muted-foreground">
+          Fix:{" "}
+          <Link
+            href="/accounts"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Accounts → Disconnect Twitter / X → Connect again
+          </Link>
+          , then click Retry publish.
         </p>
-      ))}
+      ) : null}
     </div>
   );
 }

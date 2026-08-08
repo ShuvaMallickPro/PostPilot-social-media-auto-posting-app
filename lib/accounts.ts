@@ -5,6 +5,8 @@ import {
 import {
   fetchTwitterProfile,
   getTwitterDisplayName,
+  refreshTwitterAccessToken,
+  TWITTER_RECONNECT_MESSAGE,
 } from "@/lib/twitter";
 import { prisma } from "@/lib/prisma";
 import {
@@ -170,6 +172,87 @@ export async function upsertTwitterAccount(params: {
       scope: params.scope,
     },
   });
+}
+
+/**
+ * Returns a usable Twitter access token, refreshing when near expiry.
+ * Refresh cannot add new scopes (e.g. media.write) — user must reconnect for that.
+ */
+export async function resolveTwitterAccountForPublish(userId: string): Promise<
+  | {
+      providerAccountId: string;
+      access_token: string;
+      scope: string | null;
+    }
+  | null
+> {
+  const account = await prisma.account.findFirst({
+    where: { userId, provider: "twitter" },
+    select: {
+      id: true,
+      providerAccountId: true,
+      access_token: true,
+      refresh_token: true,
+      expires_at: true,
+      scope: true,
+    },
+  });
+
+  if (!account) {
+    return null;
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const expiresSoon =
+    account.expires_at != null && account.expires_at <= nowSec + 60;
+
+  if (!expiresSoon) {
+    return {
+      providerAccountId: account.providerAccountId,
+      access_token: account.access_token,
+      scope: account.scope,
+    };
+  }
+
+  if (!account.refresh_token) {
+    throw new Error(TWITTER_RECONNECT_MESSAGE);
+  }
+
+  const clientId = process.env.TWITTER_CLIENT_ID;
+  const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    throw new Error("Twitter / X credentials are not configured.");
+  }
+
+  try {
+    const tokenData = await refreshTwitterAccessToken({
+      refreshToken: account.refresh_token,
+      clientId,
+      clientSecret,
+    });
+
+    const expiresAt = Math.floor(Date.now() / 1000) + tokenData.expires_in;
+
+    await prisma.account.update({
+      where: { id: account.id },
+      data: {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token ?? account.refresh_token,
+        expires_at: expiresAt,
+        scope: tokenData.scope ?? account.scope,
+        token_type: tokenData.token_type ?? "Bearer",
+      },
+    });
+
+    return {
+      providerAccountId: account.providerAccountId,
+      access_token: tokenData.access_token,
+      scope: tokenData.scope ?? account.scope,
+    };
+  } catch {
+    throw new Error(TWITTER_RECONNECT_MESSAGE);
+  }
 }
 
 export function getPlatformDefinitions() {

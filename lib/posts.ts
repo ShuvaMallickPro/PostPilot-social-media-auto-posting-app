@@ -4,9 +4,10 @@ import {
   POST_STATUS,
 } from "@/lib/constants/posts";
 import { PLATFORM_DEFINITIONS } from "@/lib/constants/platforms";
+import { resolveTwitterAccountForPublish } from "@/lib/accounts";
 import { publishToLinkedIn } from "@/lib/linkedin";
 import { prisma } from "@/lib/prisma";
-import { publishToTwitter } from "@/lib/twitter";
+import { publishToTwitter, TWITTER_RECONNECT_MESSAGE } from "@/lib/twitter";
 import { isPlatformId, type PlatformId } from "@/types/platform";
 
 export type CreatePostInput = {
@@ -168,6 +169,7 @@ async function publishPlatformRow(input: {
   platform: string;
   content: string;
   imageUrl: string | null;
+  userId: string;
   account:
     | {
         provider: string;
@@ -179,10 +181,10 @@ async function publishPlatformRow(input: {
   | { platform: string; success: true }
   | { platform: string; success: false; error: string }
 > {
-  const { platformRowId, platform, content, imageUrl, account } = input;
+  const { platformRowId, platform, content, imageUrl, userId, account } = input;
 
   try {
-    if (!account) {
+    if (!account && platform !== "twitter") {
       throw new Error(`No connected account for ${platform}`);
     }
 
@@ -191,9 +193,27 @@ async function publishPlatformRow(input: {
       | { success: false; error: string };
 
     if (platform === "linkedin") {
+      if (!account) {
+        throw new Error("No connected account for linkedin");
+      }
       result = await publishToLinkedIn(account, content, imageUrl);
     } else if (platform === "twitter") {
-      result = await publishToTwitter(account, content, imageUrl);
+      const twitter = await resolveTwitterAccountForPublish(userId);
+
+      if (!twitter) {
+        throw new Error("No connected account for twitter");
+      }
+
+      if (
+        imageUrl?.trim() &&
+        !(twitter.scope ?? "").split(/[\s,]+/).includes("media.write")
+      ) {
+        throw new Error(
+          `${TWITTER_RECONNECT_MESSAGE} (image posts need the media.write permission).`,
+        );
+      }
+
+      result = await publishToTwitter(twitter, content, imageUrl);
     } else {
       const label = isPlatformId(platform)
         ? PLATFORM_DEFINITIONS[platform].name
@@ -299,6 +319,7 @@ export async function publishPostForUser(
         platform: pp.platform,
         content: post.content,
         imageUrl: post.imageUrl,
+        userId,
         account: accounts.find((a) => a.provider === pp.platform),
       }),
     ),

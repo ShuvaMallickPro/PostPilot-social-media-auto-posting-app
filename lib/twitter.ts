@@ -98,6 +98,45 @@ export async function exchangeTwitterCode(params: {
   return data;
 }
 
+/** Refresh a user access token (requires offline.access + stored refresh_token). */
+export async function refreshTwitterAccessToken(params: {
+  refreshToken: string;
+  clientId: string;
+  clientSecret: string;
+}): Promise<TwitterTokenResponse> {
+  const response = await fetch(TWITTER_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: buildBasicAuthHeader(params.clientId, params.clientSecret),
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: params.refreshToken,
+      client_id: params.clientId,
+    }),
+  });
+
+  const data = (await response.json()) as TwitterTokenResponse & {
+    error?: string;
+    error_description?: string;
+  };
+
+  if (!response.ok || !data.access_token) {
+    throw new Error(
+      data.error_description ??
+        data.error ??
+        "Twitter / X token refresh failed. Reconnect your account.",
+    );
+  }
+
+  return data;
+}
+
+export const TWITTER_RECONNECT_MESSAGE =
+  "Twitter / X session expired or missing permissions. Go to Accounts → Disconnect Twitter / X → Connect again.";
+
+
 export async function fetchTwitterProfile(
   accessToken: string,
 ): Promise<TwitterProfile> {
@@ -157,7 +196,7 @@ function mapTwitterPublishError(status: number, body: string): string {
   }
 
   if (status === 401) {
-    return "Twitter / X token expired. Reconnect your account.";
+    return TWITTER_RECONNECT_MESSAGE;
   }
 
   if (status === 403) {
@@ -384,10 +423,10 @@ export async function publishToTwitter(
     const message =
       error instanceof Error ? error.message : "Twitter / X publish failed";
 
-    if (message.toLowerCase().includes("token expired")) {
+    if (message.toLowerCase().includes("token expired") || message.includes("Reconnect")) {
       return {
         success: false,
-        error: "Twitter / X token expired. Reconnect your account.",
+        error: TWITTER_RECONNECT_MESSAGE,
       };
     }
 
